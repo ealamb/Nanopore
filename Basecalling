@@ -1,0 +1,79 @@
+##Make a SLURM script to run dorado using the gpu like this:
+
+nano 
+
+###Paste in the following script
+
+#!/bin/bash
+#SBATCH -A r01267
+#SBATCH -p gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=64G
+#SBATCH --time=5:00:00
+#SBATCH --job-name=dorado_basecall
+#SBATCH --output=dorado_basecall_%j.out
+#SBATCH --error=dorado_basecall_%j.err   # <--- Separate error log
+
+# ===============================
+# Dorado Basecalling Job
+# ===============================
+
+# Fail on errors, undefined vars, and failed pipes; print commands as they run
+set -euxo pipefail
+
+echo "========================================"
+echo "Job started at: $(date)"
+echo "Running on node: $(hostname)"
+echo "========================================"
+
+echo "Allocated GPUs:"
+nvidia-smi || echo "WARNING: nvidia-smi failed"
+
+# Load modules
+module purge
+module load cudatoolkit/11.8 || echo "WARNING: failed to load cudatoolkit module"
+
+echo "CUDA version:"
+nvcc --version || echo "nvcc not found in PATH"
+
+echo "GPU status after module load:"
+nvidia-smi || echo "nvidia-smi failed again"
+
+# Change to submission directory
+cd "$SLURM_SUBMIT_DIR" || { echo "ERROR: could not cd to $SLURM_SUBMIT_DIR"; exit 1; }
+
+echo "Starting Dorado basecaller at: $(date)"
+
+# Run Dorado basecaller
+/N/slate/ealamb/lrpilot/dorado-1.1.1-linux-x64/bin/dorado basecaller \
+    /geode2/home/u030/ealamb/Quartz/dorado_models/rna004_130bps_sup@v5.2.0 \
+    /N/slate/ealamb/lrpilot/HH789_pilot_Hundley/no_sample_id/20250922_1214_MN22062_FBD58807_7a99255e/pod5/ \
+    --device cuda:all \
+    -b 12 \
+    --emit-fastq \
+    --output-dir /N/slate/ealamb/lrpilot/789_pilot_basecall_out_ \
+    2>&1 | tee dorado_runtime_%j.log
+
+status=$?
+
+echo "========================================"
+if [ $status -eq 0 ]; then
+    echo "Dorado completed successfully at: $(date)"
+else
+    echo "Dorado FAILED with exit code $status at: $(date)"
+fi
+echo "========================================"
+
+## Hit Control O and name your file
+
+##Then run the script using the sbatch command:
+
+sbatch correctedbc.sh 
+
+## Check your request is in the queue
+
+squeue -u $USER
+
+
+exit $status
