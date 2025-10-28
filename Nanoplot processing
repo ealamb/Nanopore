@@ -1,0 +1,42 @@
+conda install -c bioconda nanoplot
+
+##Remove reads without basecalling##
+
+awk 'NR%4==0 && length($0)==0 {next} {print prev} {prev=$0}' FBD58807_fastq_pass_7a99255e_d569b8d5_0.fastq > /N/slate/ealamb/lrpilot/FBD58807_fastq_pass_7a99255e_d569b8d5_0_removedmissed.fastq
+
+##Count how many reads remain##
+
+awk 'NR%4==1 {count++} END{print count}' FBD58807_fastq_pass_7a99255e_d569b8d5_0_removedmissed.fastq
+
+##Strip reads that aren't full length##
+
+awk '
+BEGIN { kept=0; stripped=0; }
+/^@/ {
+    header=$0; getline seq; getline plus; getline qual;
+    if (seq && plus && qual) {
+        print header "\n" seq "\n" plus "\n" qual
+        kept++
+    } else {
+        stripped++
+    }
+}
+END { 
+    print "Reads kept:", kept > "/dev/stderr"
+    print "Reads stripped:", stripped > "/dev/stderr"
+}' FBD58807_fastq_pass_7a99255e_d569b8d5_0_removedmissed.fastq > remove_miss_qscores_stripped.fastq
+
+NanoPlot --fastq FBD58807_fastq_pass_7a99255e_d569b8d5_0_removedmissed.fastq \
+         -o /N/slate/ealamb/lrpilot/_nanoplot_out_pass \
+         --threads 12
+
+##Download the NanoPlots-results.html to your personal desktop and look at it
+
+##Install samtools in your nanpore environment
+
+conda install -c bioconda -c conda-forge samtools
+
+##Convert your sam file to a bam file 
+
+samtools sort -o aln.bam aln.sam
+samtools index aln.bam
