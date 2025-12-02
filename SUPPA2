@@ -1,1 +1,3 @@
 conda create -n suppa python=3.4
+
+python3.4 suppa.py generateEvents -i reformatted.gtf -o lrpilotsuppa -f ioe 
